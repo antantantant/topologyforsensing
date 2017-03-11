@@ -55,10 +55,11 @@ tspan = linspace(0,T,nsteps); % t0 = 0; tf = 10, nsteps = 100;
 y = ode4(@(t,y)testode(t,y,...
     K(freedofs,freedofs),M(freedofs,freedofs),F(freedofs)),tspan,zeros(2*p,1));
 
+% plot solution
 figure; hold on;
 plot(tspan,y(:,end)); plot([0,tspan(end)],[U(end),U(end)],'-.'); 
 
-% observability
+% prepare matrices for input (force) estimation
 dt = T/nsteps;
 Kb = K(freedofs,freedofs);
 Mb = M(freedofs,freedofs);
@@ -70,6 +71,7 @@ B = [inv(Mb); zeros(p)];
 C = zeros(2*p);
 C((p+1):end,(p+1):end) = eye(p); % assume all displacements are observable
 
+% calculate some big matrices
 Ab = eye(2*p)+dt/2*A;
 AA = eye(2*p)+(dt/6*(eye(2*p) + ...
     2*Ab + 2*(eye(2*p)+dt/2*A*Ab) + (eye(2*p)+dt*A*(eye(2*p)+dt/2*A*Ab))))*A;
@@ -84,6 +86,8 @@ BB = (dt/6*(eye(2*p) + ...
 % figure; hold on;
 % plot(y(:,end),ytest(:,end)); 
 
+% calculate more matrices, see README 
+%TODO: write README
 D = zeros(2*p*(nsteps-1),p);
 for i=1:(nsteps-1)
     D((i-1)*2*p+(1:2*p),:) = C*AA^(i-1)*BB;
