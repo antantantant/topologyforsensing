@@ -4,17 +4,23 @@
 
 clear;
 close all;
-load structure.mat; % load a set of xPhys 
-number_cases = size(xPhys_set,1);
+% load structure.mat; % load a set of xPhys 
+
+T = 1e1; % maximum time
+nsteps = 1e1;
+    
+% number_cases = size(xPhys_set,1);
+number_cases = 10;
 deflection_set = zeros(number_cases,1);
-estimation_error_set = zeros(number_cases,1);
+estimation_error_set = zeros(number_cases,nsteps-1);
 % observability_set = zeros(number_cases,1);
 
-nelx = 40;
-nely = 10;
+nelx = 10;
+nely = 1;
 
 for case_id = 1:number_cases
-    xPhys = reshape(xPhys_set(case_id,:), nely, nelx);
+%     xPhys = reshape(xPhys_set(case_id,:), nely, nelx);
+    xPhys = rand(nely, nelx);
     
     %% dynamics using finite element method
     % Set parameters
@@ -56,12 +62,27 @@ for case_id = 1:number_cases
 
     % dynamic solution
     p = size(freedofs,2);
-    T = 1e1; % maximum time
-    nsteps = 1e1;
-    tspan = linspace(0,T,nsteps); % t0 = 0; tf = 10, nsteps = 100; 
-    y = ode4(@(t,y)testode(t,y,...
-        K(freedofs,freedofs),M(freedofs,freedofs),F(freedofs)),tspan,zeros(2*p,1));
-
+%     tspan = linspace(0,T,nsteps); % t0 = 0; tf = 10, nsteps = 100; 
+%     y = ode4(@(t,y)testode(t,y,...
+%         K(freedofs,freedofs),M(freedofs,freedofs),F(freedofs)),tspan,zeros(2*p,1));
+    
+    % prepare matrices for input (force) estimation
+    dt = T/nsteps;
+    Kb = K(freedofs,freedofs);
+    Mb = M(freedofs,freedofs);
+    Fb = F(freedofs);
+    A = [zeros(p), -inv(Mb)*Kb; eye(p), zeros(p)];
+    B = [inv(Mb); zeros(p)];
+    
+    % calculate some big matrices
+    AA = expm(A*dt);
+    BB = inv(A)*(AA-eye(2*p))*B;
+    
+    y = zeros(nsteps,2*p);
+    for i = 2:size(y,1)
+        y(i,:) = (AA*y(i-1,:)' + BB*Fb)';
+    end
+    
     % store max deflection
     deflection = y(:,p+1:end);
     deflection_set(case_id) = max(abs(deflection(:)));
@@ -70,26 +91,13 @@ for case_id = 1:number_cases
 %     figure; hold on;
 %     plot(tspan,y(:,end)); plot([0,tspan(end)],[U(end),U(end)],'-.'); 
 
-    % prepare matrices for input (force) estimation
-    dt = T/nsteps;
-    Kb = K(freedofs,freedofs);
-    Mb = M(freedofs,freedofs);
-    Fb = F(freedofs);
-    A = [zeros(p), -inv(Mb)*Kb; eye(p), zeros(p)];
-    B = [inv(Mb); zeros(p)];
-
     % set observer
-    C = zeros(2*p);
-    C((p+1):4:end,(p+1):4:end) = eye(p/4); 
-    C((p+2):4:end,(p+2):4:end) = eye(p/4); % assume odd nodes' displacements are observable
+    num_observer = 5;
+    S = zeros(num_observer,p); 
+    S(:,randperm(p,num_observer))=eye(num_observer);
+    C = [zeros(num_observer,p), S];
     
-    % calculate some big matrices
-    Ab = eye(2*p)+dt/2*A;
-    AA = eye(2*p)+(dt/6*(eye(2*p) + ...
-        2*Ab + 2*(eye(2*p)+dt/2*A*Ab) + (eye(2*p)+dt*A*(eye(2*p)+dt/2*A*Ab))))*A;
-    BB = (dt/6*(eye(2*p) + ...
-        2*Ab + 2*(eye(2*p)+dt/2*A*Ab) + (eye(2*p)+dt*A*(eye(2*p)+dt/2*A*Ab))))*B;
-
+    
     % calculate more matrices, see README 
     %TODO: write README
     D = zeros(2*p*(nsteps-1),p);
@@ -99,10 +107,22 @@ for case_id = 1:number_cases
     D = kron(sparse(triu(ones(nsteps-1))'),eye(2*p))*D;
 
     % input estimation 
-    Y = y(2:end,:)'; Y = Y(:);
-    fbar = (D'*D)\(D'*Y);
+%     Y = y(2:end,:)'; Y = Y(:);
+%     fbar = (D'*D)\(D'*Y);
     
-    estimation_error_set(case_id) = norm(fbar-Fb);
+    error = zeros(nsteps-1,1);
+    fbar = zeros(p,nsteps-1);
+    for i=1:nsteps-1
+        Dtemp = D(1:2*p*i,:);
+        Ytemp = C*y(2:i+1,:)';
+        Ytemp = Ytemp(:);
+        fbar(:,i) = (Dtemp'*Dtemp)\(Dtemp'*Ytemp);
+        error(i) = norm(fbar(:,i)-Fb);
+    end
+    figure;
+    plot(1:nsteps-1,error);
+
+    estimation_error_set(case_id,:) = error';
 %     observability_set(case_id) = det(D'*D);
 end
 plot(estimation_error_set, deflection_set,'.','MarkerSize',20);
