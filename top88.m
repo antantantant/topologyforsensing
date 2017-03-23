@@ -1,11 +1,17 @@
 %%%% AN 88 LINE TOPOLOGY OPTIMIZATION CODE Nov, 2010 %%%%
 % function top88(nelx,nely,volfrac,penal,rmin,ft)
-nelx = 30;
-nely = 5;
-volfrac = 0.4;
-penal = 3.0;
+nelx = 4; % horizontal number of elements (left to right)
+nely = 4; % vertical number of elements (top to down)
+penal = 3; % polynomial order to define density-young's modulus relationship
+E0 = 1; % young's modulus at density=1
+Emin = 1e-9; % young's modulus at density=0, keep this small
+nu = 0.3; % poisson's ratio
 rmin = 2;
-ft = 1;
+
+xPhys = ones(nely,nelx); 
+xPhys(2:end-1,2:end-1)=0;
+% xPhys = [1 1 0 0; 1 1 1 0; 0 1 1 1; 0 0 1 1];
+[nely,nelx] = size(xPhys);
 
 %% MATERIAL PROPERTIES
 E0 = 1;
@@ -60,8 +66,8 @@ end
 H = sparse(iH,jH,sH);
 Hs = sum(H,2);
 %% INITIALIZE ITERATION
-x = repmat(volfrac,nely,nelx);
-xPhys = x;
+% x = repmat(volfrac,nely,nelx);
+% xPhys = x;
 loop = 0;
 change = 1;
 %% START ITERATION
