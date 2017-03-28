@@ -5,13 +5,13 @@ close all;
 % load structure.mat; % load xPhys
 
 draw_deformation = 0; % draw deformation of the structure
-T = 5e1; % maximum time
-nsteps = 5e1; % time interval
-num_observer = 2; % number of observers
+test_variance = 0; % test theoretical variance, TESTED
+T = 2; % maximum time
+nsteps = 1e1; % time interval
+volfrac = 0.3; % volume fraction
 
-%% define the structure
 % Set parameters
-nelx = 4; % horizontal number of elements (left to right)
+nelx = 10; % horizontal number of elements (left to right)
 nely = 4; % vertical number of elements (top to down)
 penal = 3; % polynomial order to define density-young's modulus relationship
 E0 = 1; % young's modulus at density=1
@@ -20,6 +20,19 @@ M0 = 1;
 Mmin = 1e-9;
 nu = 0.3; % poisson's ratio
 
+nf = nelx; % number of forces
+num_observer = nf; % number of observers
+
+% set observer
+S = zeros(num_observer,p); 
+% S(:,randperm(p,num_observer))=eye(num_observer);
+S(:,2*(1:nelx)*(nely+1)+1) = eye(nelx); % put y-axis sensors on top of the beam
+
+Fb = 0.1*ones(nelx,1);
+Sp = zeros(p,nf); % Sp specifies the loading location
+Sp(:)
+
+%% define the structure
 % element-wise stiffness matrix for a quadrilateral element (square in shape)
 A11 = [12  3 -6 -3;  3 12  3  0; -6  3 12 -3; -3  0 -3 12]; %stiffness matrix
 A12 = [-6 -3  0  3; -3 -6 -3 -6;  0 -3 -6  3;  3 -6  3 -6];
@@ -33,7 +46,7 @@ ME = (4*eye(8) + [zeros(4),eye(4);eye(4),zeros(4)] + repmat(kron([0 1;1 0],2*eye
 % define material density
 % this is now loaded from an existing file structure.mat
 % xPhys = rand(nely,nelx);
-xPhys = ones(nely,nelx); 
+xPhys = volfrac*ones(nely,nelx); 
 % xPhys(2:end-1,2:end-1)=0;
 % xPhys = [1 1 0 0; 1 1 1 0; 0 1 1 1; 0 0 1 1];
 [nely,nelx] = size(xPhys);
@@ -62,10 +75,6 @@ p = size(freedofs,2);
 dt = T/nsteps;
 Kb = K(freedofs,freedofs);
 Mb = M(freedofs,freedofs);
-Fb = [0.1;0.1];
-Sp = zeros(p,2); % Sp specifies the loading location
-Sp(end,1)=1; Sp(end-1,2)=1;
-nf = size(Sp,2); % number of forces
 
 A = [zeros(p), -Mb\Kb; eye(p), zeros(p)];
 B = [inv(Mb)*Sp; zeros(p,nf)];
@@ -124,47 +133,136 @@ end
 % BB_r = inv(A_r)*(AA_r-eye(2*nm))*B_r;
 
 %% input estimation
-% set observer
-S = zeros(num_observer,p); 
-% S(:,randperm(p,num_observer))=eye(num_observer);
-S(1,end) = 1; S(2,end-1) = 1;
-
 % calculate matrices for observability
 D = S*inv(Mb)*Sp;
 C1 = -S*inv(Mb)*Kb;
 C = [zeros(num_observer,p), C1];
 % M2 follows corollary 5 eq 35
 % M1 follows eq 13b
-M2 = D;
-M1 = M2;
 
-rankM2 = zeros(nsteps,1);
-rankM1 = zeros(nsteps,1);
-error = zeros(nsteps-1,nf);
-fbar = zeros(nsteps-1,nf);
 
-% add noise to state
-noise_std = (max(abs(acc(:)))-min(abs(acc(:))))*0.1;
-acc_noise = acc + normrnd(0,noise_std,size(acc,1),size(acc,2));
+%% check theoretical variance with simulation results
+if test_variance
+    % rankM2 = zeros(nsteps,1);
+    % rankM1 = zeros(nsteps,1);
+    num_test = 1000;
+    error = zeros(num_test, nsteps-1,nf);
+    fbar = zeros(nsteps-1,nf);
 
-theoretical_estimation_std = noise_std./sqrt(eig(D'*D))
-for i = 1:nsteps-1
-    Ytemp = S*acc_noise(1:i,:)';
-    Ytemp = Ytemp(:);
-    temp = ((M1'*M1)\(M1'*Ytemp))';
-    fbar(i,:) = temp((i-1)*nf+(1:nf));
-    error(i,:) = (fbar(i,:)'-Fb_set((i-1)*nf+(1:nf)))';
-%     error(i) = norm(fbar-Fb_set(1:i*nf))/i;
-%     rankM2(i) = rank(M2);
-%     rankM1(i) = rank(M1);
-    M2 = [M2; C*AA^(i-1)*BB];
-    M1 = [M2,[zeros(num_observer,nf*i);M1]];
+    for test_id = 1:num_test
+        % add noise to state
+        noise_std = 0.1;
+        acc_noise = acc + normrnd(0,noise_std,size(acc,1),size(acc,2));
+        M2 = D;
+        M1 = M2;
+
+        for i = 1:nsteps-1
+            Ytemp = S*acc_noise(1:i,:)';
+            Ytemp = Ytemp(:);
+            temp = ((M1'*M1)\(M1'*Ytemp))';
+            fbar(i,:) = temp((i-1)*nf+(1:nf));
+            error(test_id, i,:) = (fbar(i,:)'-Fb_set((i-1)*nf+(1:nf)))';
+        %     error(i) = norm(fbar-Fb_set(1:i*nf))/i;
+        %     rankM2(i) = rank(M2);
+        %     rankM1(i) = rank(M1);
+            M2 = [M2; C*AA^(i-1)*BB];
+            M1 = [M2,[zeros(num_observer,nf*i);M1]];
+        end
+        % rankM2(i) = rank(M2);
+        % rankM1(i) = rank(M1);
+    end
+    theoretical_estimation_std = noise_std*sqrt(diag(inv(M1'*M1)));
+
+
+    % figure;
+    % plot(1:nsteps-1,error);
+    std(error,1)
+    % log(det(D'*D))
+    % eig(D'*D)
 end
-% rankM2(i) = rank(M2);
-% rankM1(i) = rank(M1);
 
-% figure;
-% plot(1:nsteps-1,error);
-mean(abs(error),1)
-% log(det(D'*D))
-% eig(D'*D)
+%% calculate theoretical variance gradient
+
+%%%%%%%%%%%%%%%% just to double check: only need to consider D
+% M2 = D;
+% M1 = M2;
+% logdetM1 = zeros(nsteps,1);
+% logdetM1(1) = log(det(M1'*M1));
+% for i = 1:nsteps-1
+%     M2 = [M2; C*AA^(i-1)*BB];
+%     M1 = [M2,[zeros(num_observer,nf*i);M1]];
+%     logdetM1(i+1) = log(det(M1'*M1));
+% end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% This is how mass is calculated
+% iK = reshape(kron(edofMat,ones(8,1))',64*nelx*nely,1);
+% jK = reshape(kron(edofMat,ones(1,8))',64*nelx*nely,1);
+% sK = reshape(KE(:)*(Emin+xPhys(:)'.^penal*(E0-Emin)),64*nelx*nely,1);
+% K = sparse(iK,jK,sK); K = (K+K')/2;
+% sM = reshape(ME(:)*(Mmin+xPhys(:)'*(M0-Mmin)),64*nelx*nely,1);
+% M = sparse(iK,jK,sM);
+
+% All dofs:
+% fixeddofs = [1:2*(nely+1)];
+% alldofs = [1:2*(nely+1)*(nelx+1)];
+% freedofs = setdiff(alldofs,fixeddofs);
+Sp_all = sparse(repmat(freedofs,1,nf),repmat(1:nf,1,length(freedofs)),...
+    Sp,2*(nely+1)*(nelx+1),nf);
+S_all = sparse(repmat(1:num_observer,1,length(freedofs)),repmat(freedofs,1,nf),...
+    S,num_observer,2*(nely+1)*(nelx+1));
+
+% gradient descent for observability
+% ***zero density of the element where input (or observer???) is at maximizes the trace
+% but this violates the stress/compliance requirement
+
+x_old = xPhys(:);
+x = x_old;
+dx = ones(nelx*nely,1);
+free_var = 1:(nelx*nely-1); % fix the last element where observers/inputs are currently at
+
+loop = 0;
+change = 1;
+
+%% START ITERATION
+while change > 0.01
+    loop = loop + 1;
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    % calculation of dtr(D)/dx = dtr(SM^-1Sp)/d(M)*d(M)/dx
+    dtr_dx = zeros(nelx*nely,1);
+    dtr_dM = -(inv(M)*Sp_all*S_all*inv(M))';
+    count = 0;
+    while count<nelx*nely
+        dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
+            ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
+        dtr_dx(count+1) = trace(dtr_dM*dM_dx);
+        count = count + 1;
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+    dc = dtr_dx(free_var);
+    dv = ones(length(free_var),1);
+    % iterate on step size
+    alpha = 1e-1;
+    vol_gap = 1;
+    while vol_gap>1e-3
+        alpha = alpha/2;
+        dx = alpha*(dc - dv'*dc*dv/(dv'*dv));
+        x(free_var) = max(min(x_old(free_var)+dx,1),0);
+        vol_gap = abs(sum(x)-volfrac*nelx*nely);
+    end
+    change = max(abs(x-x_old));
+    x_old = x;
+    % update mass
+    sM = reshape(ME(:)*(Mmin+x(:)'*(M0-Mmin)),64*nelx*nely,1);
+    M = sparse(iK,jK,sM);  
+
+    % update trace of D
+    trace(S_all*inv(M)*Sp_all)
+    colormap(gray); imagesc(1-reshape(x,nely,nelx)); caxis([0 1]); axis equal; axis off; drawnow;
+
+end
+
+
+
