@@ -229,20 +229,34 @@ if optimize
     while change > 1e-6
         loop = loop + 1;
 
+%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         % calculation of dtr(D)/dx = dtr(SM^-1Sp)/d(M)*d(M)/dx
+%         dtr_dx = zeros(nelx*nely,1);
+%         dtr_dM = -(inv(Mb)*Sp*S*inv(Mb))';
+%         count = 0;
+%         while count<nelx*nely
+%             dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
+%                 ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
+%             dtr_dx(count+1) = trace(dtr_dM*dM_dx(freedofs,freedofs));
+%             count = count + 1;
+%         end
+%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % calculation of dtr(D)/dx = dtr(SM^-1Sp)/d(M)*d(M)/dx
-        dtr_dx = zeros(nelx*nely,1);
-        dtr_dM = -(inv(Mb)*Sp*S*inv(Mb))';
+        % calculation of ddet(D)/dx = det(SM^-1Sp)M'*d(M^-1)/dx
+        ddet_dx = zeros(nelx*nely,1);
+        ddet_dinvM = det(S*inv(Mb)*Sp)*Mb';
         count = 0;
         while count<nelx*nely
             dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
                 ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
-            dtr_dx(count+1) = trace(dtr_dM*dM_dx(freedofs,freedofs));
+            ddet_dx(count+1) = trace(ddet_dinvM*...
+                (-inv(Mb)*dM_dx(freedofs,freedofs)*inv(Mb))');
             count = count + 1;
         end
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-        dc = dtr_dx(free_var);
+        dc = ddet_dx(free_var);
         dv = ones(length(free_var),1);
         % iterate on step size
         alpha = 1e-1;
