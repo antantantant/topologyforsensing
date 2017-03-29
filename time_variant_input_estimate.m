@@ -40,9 +40,9 @@ Sp = zeros(p,nf); % Sp specifies the loading location
 Sp(2*(1:nelx)*(nely+1),:) = eye(nelx); % put loads at the bottom of the beam
 
 % define material density
-% xPhys = rand(nely,nelx);
-% xPhys = xPhys/sum(xPhys(:))*volfrac*nelx*nely;
-xPhys = volfrac*ones(nely,nelx); 
+xPhys = rand(nely,nelx);
+xPhys = xPhys/sum(xPhys(:))*volfrac*nelx*nely;
+% xPhys = volfrac*ones(nely,nelx); 
 % xPhys(2:end-1,2:end-1)=0;
 % xPhys = [1 1 0 0; 1 1 1 0; 0 1 1 1; 0 0 1 1];
 
@@ -214,82 +214,97 @@ if optimize
     % gradient descent for observability
     % ***zero density of the element where input (or observer???) is at maximizes the trace
     % but this violates the stress/compliance requirement
+    
+    
+    % use multistart to deal with local solutions
+    ntrial = 1000;
+    x_soln = zeros(nelx*nely,ntrial);
+    f_soln = zeros(1,ntrial);
+    for trial = 1:ntrial
+        x0 = rand(nely,nelx);
+        x0 = x0/sum(x0(:))*volfrac*nelx*nely;
+        x_old = x0(:);
+        x = x_old;
+        dx = ones(nelx*nely,1);
+        free_var = 1:(nelx*nely-1); % fix the last element where observers/inputs are currently at
 
-    x_old = xPhys(:);
-    x = x_old;
-    dx = ones(nelx*nely,1);
-    free_var = 1:(nelx*nely-1); % fix the last element where observers/inputs are currently at
+        loop = 0;
+        change = 1;
+        detD = [];
 
-    loop = 0;
-    change = 1;
-    detD = [];
+        %% START ITERATION
+        figure;
+        while change > 1e-6
+            loop = loop + 1;
 
-    %% START ITERATION
-    figure;
-    while change > 1e-6
-        loop = loop + 1;
+    %         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %         % calculation of dtr(D)/dx = dtr(SM^-1Sp)/d(M)*d(M)/dx
+    %         dtr_dx = zeros(nelx*nely,1);
+    %         dtr_dM = -(inv(Mb)*Sp*S*inv(Mb))';
+    %         count = 0;
+    %         while count<nelx*nely
+    %             dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
+    %                 ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
+    %             dtr_dx(count+1) = trace(dtr_dM*dM_dx(freedofs,freedofs));
+    %             count = count + 1;
+    %         end
+    %         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %         
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % calculation of ddet(D)/dx = det(SM^-1Sp)M'*d(M^-1)/dx
+            ddet_dx = zeros(nelx*nely,1);
+            ddet_dinvM = det(S*inv(Mb)*Sp)*Mb';
+            count = 0;
+            while count<nelx*nely
+                dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
+                    ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
+                ddet_dx(count+1) = trace(ddet_dinvM*...
+                    (-inv(Mb)*dM_dx(freedofs,freedofs)*inv(Mb))');
+                count = count + 1;
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%         % calculation of dtr(D)/dx = dtr(SM^-1Sp)/d(M)*d(M)/dx
-%         dtr_dx = zeros(nelx*nely,1);
-%         dtr_dM = -(inv(Mb)*Sp*S*inv(Mb))';
-%         count = 0;
-%         while count<nelx*nely
-%             dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
-%                 ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
-%             dtr_dx(count+1) = trace(dtr_dM*dM_dx(freedofs,freedofs));
-%             count = count + 1;
-%         end
-%         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%         
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        % calculation of ddet(D)/dx = det(SM^-1Sp)M'*d(M^-1)/dx
-        ddet_dx = zeros(nelx*nely,1);
-        ddet_dinvM = det(S*inv(Mb)*Sp)*Mb';
-        count = 0;
-        while count<nelx*nely
-            dM_dx = sparse(iK(count*64+(1:64)), jK(count*64+(1:64)), ...
-                ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
-            ddet_dx(count+1) = trace(ddet_dinvM*...
-                (-inv(Mb)*dM_dx(freedofs,freedofs)*inv(Mb))');
-            count = count + 1;
+            dc = ddet_dx(free_var);
+            dv = ones(length(free_var),1);
+            % iterate on step size
+            alpha = 1e-1;
+            vol_gap = 1;
+            while vol_gap>1e-3
+                alpha = alpha/2;
+                dx = alpha*(dc - dv'*dc*dv/(dv'*dv));
+                x(free_var) = max(min(x_old(free_var)+dx,1),0);
+                vol_gap = abs(sum(x)-volfrac*nelx*nely);
+            end
+            change = max(abs(x-x_old));
+            x_old = x;
+            % update mass
+            sM = reshape(ME(:)*(Mmin+x(:)'*(M0-Mmin)),64*nelx*nely,1);
+            M = sparse(iK,jK,sM);  
+            Mb = M(freedofs,freedofs);
+
+            % update trace of D
+            detD(loop) = log(det(S*inv(Mb)*Sp));
+
         end
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-        dc = ddet_dx(free_var);
-        dv = ones(length(free_var),1);
-        % iterate on step size
-        alpha = 1e-1;
-        vol_gap = 1;
-        while vol_gap>1e-3
-            alpha = alpha/2;
-            dx = alpha*(dc - dv'*dc*dv/(dv'*dv));
-            x(free_var) = max(min(x_old(free_var)+dx,1),0);
-            vol_gap = abs(sum(x)-volfrac*nelx*nely);
-        end
-        change = max(abs(x-x_old));
-        x_old = x;
-        % update mass
-        sM = reshape(ME(:)*(Mmin+x(:)'*(M0-Mmin)),64*nelx*nely,1);
-        M = sparse(iK,jK,sM);  
-        Mb = M(freedofs,freedofs);
-        
-        % update trace of D
-        detD(loop) = log(det(S*inv(Mb)*Sp));
-        colormap(gray); imagesc(1-reshape(x,nely,nelx)); 
-        caxis([0 1]); axis equal; axis off; drawnow;
+        x_soln(:,trial) = x;
+        f_soln(trial) = detD(end);
     end
-    figure;
-    plot(detD)
-    save('topopt_obs.mat','x','nelx','nely','S','Sp');
+    x_best = x_soln(:,f_soln==max(f_soln));
+    colormap(gray); imagesc(1-reshape(x_best,nely,nelx)); 
+    caxis([0 1]); axis equal; axis off; drawnow;
+%     figure;
+%     plot(detD)
+    save('topopt_obs.mat','x_best','nelx','nely','S','Sp');
 end
 
 %% check difference between topopt_obs and default design
 x_default = xPhys;
-x_topopt = x;
+x_topopt = x_best;
 sM = reshape(ME(:)*(Mmin+x_default(:)'*(M0-Mmin)),64*nelx*nely,1);
-M_default = sparse(iK,jK,sM);  
+M_default = sparse(iK,jK,sM); 
+sK = reshape(KE(:)*(Emin+x_topopt(:)'.^penal*(E0-Emin)),64*nelx*nely,1);
 sM = reshape(ME(:)*(Mmin+x_topopt(:)'*(M0-Mmin)),64*nelx*nely,1);
+K_topopt = sparse(iK,jK,sK); K_topopt = (K_topopt+K_topopt')/2;
 M_topopt = sparse(iK,jK,sM);
 
 num_test = 1000;
@@ -327,8 +342,9 @@ std(error_default,1)
 
 % now test topopt
 Mb_topopt = M_topopt(freedofs,freedofs);
+Kb_topopt = K_topopt(freedofs,freedofs);
 % rerun dynamic simulation
-A_topopt = [zeros(p), -Mb_topopt\Kb; eye(p), zeros(p)];
+A_topopt = [zeros(p), -Mb_topopt\Kb_topopt; eye(p), zeros(p)];
 B_topopt = [inv(Mb_topopt)*Sp; zeros(p,nf)];
 AA_topopt = expm(A_topopt*dt);
 BB_topopt = inv(A_topopt)*(AA_topopt-eye(2*p))*B_topopt;
@@ -339,10 +355,10 @@ end
 
 % calculate the acceleration (since we will use acc as the observation)
 acc_topopt = (inv(Mb_topopt)*Sp*reshape(Fb_set,nf,nsteps-1) -...
-    inv(Mb_topopt)*Kb*y(1:end-1,p+1:end)')';
+    inv(Mb_topopt)*Kb_topopt*y(1:end-1,p+1:end)')';
 
 D_topopt = S*inv(Mb_topopt)*Sp;
-C1_topopt = -S*inv(Mb_topopt)*Kb;
+C1_topopt = -S*inv(Mb_topopt)*Kb_topopt;
 C_topopt = [zeros(num_observer,p), C1_topopt];
 fbar_topopt = zeros(nsteps-1,nf);
 for test_id = 1:num_test
