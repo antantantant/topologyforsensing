@@ -4,7 +4,7 @@ clear;
 close all;
 % load structure.mat; % load xPhys
 
-draw_deformation = 0; % draw deformation of the structure
+draw_deformation = 1; % draw deformation of the structure
 T = 1e2; % maximum time
 nsteps = 1e2;
 
