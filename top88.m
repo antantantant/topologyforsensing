@@ -1,12 +1,14 @@
 %%%% AN 88 LINE TOPOLOGY OPTIMIZATION CODE Nov, 2010 %%%%
 % function top88(nelx,nely,volfrac,penal,rmin,ft)
-nelx = 4; % horizontal number of elements (left to right)
-nely = 4; % vertical number of elements (top to down)
+nelx = 20; % horizontal number of elements (left to right)
+nely = 10; % vertical number of elements (top to down)
 penal = 3; % polynomial order to define density-young's modulus relationship
 E0 = 1; % young's modulus at density=1
 Emin = 1e-9; % young's modulus at density=0, keep this small
 nu = 0.3; % poisson's ratio
-rmin = 2;
+rmin = 1.5;
+ft = 1;
+volfrac = 0.3;
 
 xPhys = ones(nely,nelx); 
 xPhys(2:end-1,2:end-1)=0;
@@ -29,7 +31,7 @@ edofMat = repmat(edofVec,1,8)+repmat([0 1 2*nely+[2 3 0 1] -2 -1],nelx*nely,1);
 iK = reshape(kron(edofMat,ones(8,1))',64*nelx*nely,1);
 jK = reshape(kron(edofMat,ones(1,8))',64*nelx*nely,1);
 % DEFINE LOADS AND SUPPORTS (HALF MBB-BEAM)
-F = sparse(2,1,-1,2*(nely+1)*(nelx+1),1);
+F = sparse((1:(nelx+1))*(nely+1)*2,1,-1,2*(nely+1)*(nelx+1),1);
 % F = sparse(zeros(2*(nely+1)*(nelx+1),1));
 % F(2:2*(nely+1):end) = -1;
 % slope = 30;
@@ -39,7 +41,8 @@ F = sparse(2,1,-1,2*(nely+1)*(nelx+1),1);
 % F(id,1) = -1;
 
 U = zeros(2*(nely+1)*(nelx+1),1);
-fixeddofs = union([1:2:2*(nely+1)],[2*(nelx+1)*(nely+1)]);
+fixeddofs = 1:2*(nely+1);
+% fixeddofs = union([1:2:2*(nely+1)],[2*(nelx+1)*(nely+1)]);
 % fixeddofs = [2*nely+1,2*(nely+1),2*nelx*(nely+1)+nely*2+1,2*(nelx+1)*(nely+1)];
 % fixeddofs = [2*nely+1,2*(nely+1),2*nelx*(nely+1)+nely*2+1-slope*2,2*(nelx+1)*(nely+1)-slope*2];
 alldofs = [1:2*(nely+1)*(nelx+1)];
@@ -66,8 +69,8 @@ end
 H = sparse(iH,jH,sH);
 Hs = sum(H,2);
 %% INITIALIZE ITERATION
-% x = repmat(volfrac,nely,nelx);
-% xPhys = x;
+x = repmat(volfrac,nely,nelx);
+xPhys = x;
 loop = 0;
 change = 1;
 %% START ITERATION
@@ -94,6 +97,8 @@ while change > 0.01
   while (l2-l1)/(l1+l2) > 1e-3
     lmid = 0.5*(l2+l1);
     xnew = max(0,max(x-move,min(1,min(x+move,x.*sqrt(-dc./dv/lmid)))));
+%     xnew = max(0,max(x-move,min(1,min(x+move,x-dc/lmid))));
+
     if ft == 1
       xPhys = xnew;
     elseif ft == 2

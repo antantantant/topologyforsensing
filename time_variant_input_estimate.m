@@ -4,7 +4,7 @@ clear;
 close all;
 % load structure.mat; % load xPhys
 
-draw_deformation = 1; % draw deformation of the structure
+draw_deformation = 0; % draw deformation of the structure
 test_variance = 0; % test theoretical variance, TESTED
 optimize = 1; % topology optimization for observability
 T = 1e1; % maximum time
