@@ -1,19 +1,19 @@
 % time invariant force, linear time invariant system
 
-clear;
-close all;
+% clear;
+% close all;
 % load structure.mat; % load xPhys
 
-draw_deformation = 0; % draw deformation of the structure
-test_variance = 0; % test theoretical variance, TESTED
+draw_deformation = 1; % draw deformation of the structure
+test_variance = 1; % test theoretical variance, TESTED
 optimize = 1; % topology optimization for observability
-T = 1e1; % maximum time
-nsteps = 1e1; % time interval
+T = 1e2; % maximum time
+nsteps = 2; % time interval
 volfrac = 0.3; % volume fraction
 
 % Set parameters
-nelx = 4; % horizontal number of elements (left to right)
-nely = 4; % vertical number of elements (top to down)
+nelx = 80; % horizontal number of elements (left to right)
+nely = 20; % vertical number of elements (top to down)
 penal = 3; % polynomial order to define density-young's modulus relationship
 E0 = 1; % young's modulus at density=1
 Emin = 1e-9; % young's modulus at density=0, keep this small
@@ -40,8 +40,9 @@ Sp = zeros(p,nf); % Sp specifies the loading location
 Sp(2*(1:nelx)*(nely+1),:) = eye(nelx); % put loads at the bottom of the beam
 
 % define material density
-xPhys = rand(nely,nelx);
-xPhys = xPhys/sum(xPhys(:))*volfrac*nelx*nely;
+xPhys = reshape(x_soln(:,end),nely*nelx,1);
+% xPhys = rand(nely,nelx);
+% xPhys = xPhys/sum(xPhys(:))*volfrac*nelx*nely;
 % xPhys = volfrac*ones(nely,nelx); 
 % xPhys(2:end-1,2:end-1)=0;
 % xPhys = [1 1 0 0; 1 1 1 0; 0 1 1 1; 0 0 1 1];
@@ -76,12 +77,12 @@ Kb = K(freedofs,freedofs);
 Mb = M(freedofs,freedofs);
 
 A = [zeros(p), -Mb\Kb; eye(p), zeros(p)];
-B = [inv(Mb)*Sp; zeros(p,nf)];
+B = [Mb\Sp; zeros(p,nf)];
 
 % calculate some big matrices
 %The following uses a theoretical solution
 AA = expm(A*dt);
-BB = inv(A)*(AA-eye(2*p))*B;
+BB = A\(AA-eye(2*p))*B;
 
 % time variant input Fb*i
 Fb_set = kron((1:nsteps-1)',eye(nf))*Fb;
@@ -96,7 +97,7 @@ acc = (inv(Mb)*Sp*reshape(Fb_set,nf,nsteps-1) -...
 % draw the structure
 if draw_deformation
     for tt = 1:nsteps
-        if mod(tt,10)==1
+%         if mod(tt,10)==1
             figure; hold on; axis equal;
             sx = repmat(0:nelx,nely+1,1);
             sy = repmat((nely:-1:0)',1,nelx+1);
@@ -114,8 +115,16 @@ if draw_deformation
             for ii=1:nely+1
                 plot(sxx(ii,:),syy(ii,:));
             end
-        end
+%         end
     end
+    figure;
+    xPhys_all = zeros(nely+1,nelx+1);xPhys_all(2:end,2:end)=reshape(xPhys,nely,nelx);
+    y_all = zeros(2*(nely+1)*(nelx+1),1); y_all(2*(nely+1)+1:end) = y(end,p+1:end)';
+    dy = reshape(y_all(2:2:end),nely+1,nelx+1); 
+    dy_normal = dy/max(abs(y(:))+eps);
+    final_deformation = (xPhys_all>0).*-dy_normal;
+    imagesc(final_deformation);
+    axis equal; axis off; drawnow;
 end
 
 %% model reduction
@@ -179,7 +188,9 @@ if test_variance
     % log(det(D'*D))
     % eig(D'*D)
 end
-
+figure;shadedErrorBar(1:80,mean(error,1),std(error,1),'g');
+hold on; plot(theoretical_estimation_std(1:80));
+hold on; plot(-theoretical_estimation_std(1:80));
 %% calculate theoretical variance gradient
 if optimize
     %%%%%%%%%%%%%%%% just to double check: only need to consider D

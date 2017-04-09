@@ -54,10 +54,10 @@ iK = reshape(kron(edofMat,ones(8,1))',64*nelx*nely,1);
 jK = reshape(kron(edofMat,ones(1,8))',64*nelx*nely,1);
 
 %% all designs
-nsamples = 1e5;
+nsamples = 1e4;
 x = rand(nsamples,nelx*nely);
 x = bsxfun(@rdivide, x, sum(x,2));
-x = x*volfrac;
+x = x*volfrac*nelx*nely;
 
 %% create all data
 compliance_set = zeros(nsamples,1);
