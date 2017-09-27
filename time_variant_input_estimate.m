@@ -6,14 +6,16 @@
 
 draw_deformation = 0; % draw deformation of the structure
 test_variance = 1; % test theoretical variance, TESTED
+
 optimize = 0; % topology optimization for observability
 T = 1e2; % maximum time
 nsteps = 2; % time interval
+
 volfrac = 0.3; % volume fraction
 
 % Set parameters
-nelx = 80; % horizontal number of elements (left to right)
-nely = 20; % vertical number of elements (top to down)
+nelx = 10; % horizontal number of elements (left to right)
+nely = 4; % vertical number of elements (top to down)
 penal = 3; % polynomial order to define density-young's modulus relationship
 E0 = 1; % young's modulus at density=1
 Emin = 1e-9; % young's modulus at density=0, keep this small
@@ -61,7 +63,8 @@ Fb = -1*ones(nelx,1);
 
 
 % define material density
-xPhys = reshape(x_soln(:,end),nely*nelx,1);
+xPhys = ones(nely,nelx);
+% xPhys = reshape(x_soln(:,end),nely*nelx,1);
 % xPhys = rand(nely,nelx);
 % xPhys = xPhys/sum(xPhys(:))*volfrac*nelx*nely;
 % xPhys = volfrac*ones(nely,nelx); 
