@@ -4,9 +4,9 @@
 % close all;
 % load structure.mat; % load xPhys
 
-draw_deformation = 1; % draw deformation of the structure
+draw_deformation = 0; % draw deformation of the structure
 test_variance = 1; % test theoretical variance, TESTED
-optimize = 1; % topology optimization for observability
+optimize = 0; % topology optimization for observability
 T = 1e2; % maximum time
 nsteps = 2; % time interval
 volfrac = 0.3; % volume fraction
@@ -24,6 +24,7 @@ nu = 0.3; % poisson's ratio
 nf = nelx; % number of forces
 num_observer = nf; % number of observers
 
+% Case 1
 % Left size of the beam is fixed to the ground
 fixeddofs = [1:2*(nely+1)];
 alldofs = [1:2*(nely+1)*(nelx+1)];
@@ -35,9 +36,29 @@ S = zeros(num_observer,p);
 % S(:,randperm(p,num_observer))=eye(num_observer);
 S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
 
-Fb = -1*ones(nelx,1);
 Sp = zeros(p,nf); % Sp specifies the loading location
 Sp(2*(1:nelx)*(nely+1),:) = eye(nelx); % put loads at the bottom of the beam
+Fb = -1*ones(nelx,1);
+
+% % Case 2
+% % Left size of the beam is fixed to the ground
+% % fixeddofs = [1:2*(nely+1)];
+% fixeddofs = [1:2*(nely+1),(2*(nelx-1)*(nely+1)+1):2*nelx*(nely+1)];
+% alldofs = [1:2*(nely+1)*(nelx+1)];
+% freedofs = setdiff(alldofs,fixeddofs);
+% p = size(freedofs,2);
+% 
+% % set observer
+% S = zeros(num_observer,p); 
+% % S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
+% S(:,[nelx*(nely+1)-1,nelx*(nely+1)]) = eye(num_observer); % put y-axis sensors on top of the beam
+% 
+% % set loads
+% Sp = zeros(p,nf); % Sp specifies the loading location
+% Sp([nelx*(nely+1)-1,nelx*(nely+1)],:) = eye(nf); % put loads at the bottom of the beam
+% Fb = -1*ones(nf,1);
+
+
 
 % define material density
 xPhys = reshape(x_soln(:,end),nely*nelx,1);

@@ -21,6 +21,7 @@ nu = 0.3; % poisson's ratio
 nf = nelx; % number of forces
 num_observer = nf; % number of observers
 
+% Case 1
 % Left size of the beam is fixed to the ground
 fixeddofs = [1:2*(nely+1)];
 alldofs = [1:2*(nely+1)*(nelx+1)];
@@ -34,6 +35,23 @@ S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
 
 Sp = zeros(p,nf); % Sp specifies the loading location
 Sp(2*(1:nelx)*(nely+1),:) = eye(nelx); % put loads at the bottom of the beam
+
+% % Case 2
+% % Left size of the beam is fixed to the ground
+% % fixeddofs = [1:2*(nely+1)];
+% fixeddofs = [1:2*(nely+1),(2*(nelx-1)*(nely+1)+1):2*nelx*(nely+1)];
+% alldofs = [1:2*(nely+1)*(nelx+1)];
+% freedofs = setdiff(alldofs,fixeddofs);
+% p = size(freedofs,2);
+% 
+% % set observer
+% S = zeros(num_observer,p); 
+% % S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
+% S(:,[nelx*(nely+1)-1,nelx*(nely+1)]) = eye(num_observer); % put y-axis sensors on top of the beam
+% 
+% % set loads
+% Sp = zeros(p,nf); % Sp specifies the loading location
+% Sp([nelx*(nely+1)-1,nelx*(nely+1)],:) = eye(nf); % put loads at the bottom of the beam
 
 %% define the structure
 % element-wise stiffness matrix for a quadrilateral element (square in shape)
@@ -55,7 +73,7 @@ jK = reshape(kron(edofMat,ones(1,8))',64*nelx*nely,1);
 
 %% all designs
 % x = ones(nely*nelx,1)*volfrac;
-x = x_soln(:,1);
+x = x_soln(:,end);
 
 %% create all data
 xPhys = reshape(x,nely,nelx);

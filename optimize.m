@@ -13,25 +13,42 @@
 % rmin = 1.5; % filter size
 % volfrac = 0.3; % volume fraction
 % 
-% % nf = nelx; % number of forces
-% nf = 2;
+% nf = nelx; % number of forces
+% % nf = 2;
 % num_observer = nf; % number of observers
 % 
+% % Case 1
 % % Left size of the beam is fixed to the ground
-% % fixeddofs = [1:2*(nely+1)];
-% fixeddofs = [1:2*(nely+1),(2*(nelx-1)*(nely+1)+1):2*nelx*(nely+1)];
+% fixeddofs = [1:2*(nely+1)];
 % alldofs = [1:2*(nely+1)*(nelx+1)];
 % freedofs = setdiff(alldofs,fixeddofs);
 % p = size(freedofs,2);
 % 
 % % set observer
 % S = zeros(num_observer,p); 
-% % S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
-% S(:,[nelx*(nely+1)-1,nelx*(nely+1)]) = eye(num_observer); % put y-axis sensors on top of the beam
+% % S(:,randperm(p,num_observer))=eye(num_observer);
+% S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
 % 
-% % set loads
 % Sp = zeros(p,nf); % Sp specifies the loading location
-% Sp([nelx*(nely+1)-1,nelx*(nely+1)],:) = eye(nf); % put loads at the bottom of the beam
+% Sp(2*(1:nelx)*(nely+1),:) = eye(nelx); % put loads at the bottom of the beam
+% Fb = -1*ones(nelx,1);
+% 
+% % % Case 2
+% % % Left size of the beam is fixed to the ground
+% % % fixeddofs = [1:2*(nely+1)];
+% % fixeddofs = [1:2*(nely+1),(2*(nelx-1)*(nely+1)+1):2*nelx*(nely+1)];
+% % alldofs = [1:2*(nely+1)*(nelx+1)];
+% % freedofs = setdiff(alldofs,fixeddofs);
+% % p = size(freedofs,2);
+% % 
+% % % set observer
+% % S = zeros(num_observer,p); 
+% % % S(:,2*(1:nelx)*(nely+1)) = eye(nelx); % put y-axis sensors on top of the beam
+% % S(:,[nelx*(nely+1)-1,nelx*(nely+1)]) = eye(num_observer); % put y-axis sensors on top of the beam
+% % 
+% % % set loads
+% % Sp = zeros(p,nf); % Sp specifies the loading location
+% % Sp([nelx*(nely+1)-1,nelx*(nely+1)],:) = eye(nf); % put loads at the bottom of the beam
 % 
 % %% define the structure
 % % element-wise stiffness matrix for a quadrilateral element (square in shape)
@@ -52,14 +69,14 @@
 % jK = reshape(kron(edofMat,ones(1,8))',64*nelx*nely,1);
 % 
 % % static input
-% % Fb = sparse(find(sum(Sp,2)==1),1,-1,p,1);
-% Fb1 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(0),sin(0)],p,1);
-% Fb2 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/6),sin(pi/6)],p,1);
-% Fb3 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/3),sin(pi/3)],p,1);
-% Fb4 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/2),sin(pi/2)],p,1);
-% Fb5 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(4*pi/6),sin(4*pi/6)],p,1);
-% Fb6 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(5*pi/6),sin(5*pi/6)],p,1);
-% Fb7 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(6*pi/6),sin(6*pi/6)],p,1);
+% Fb = sparse(find(sum(Sp,2)==1),1,-1,p,1);
+% % Fb1 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(0),sin(0)],p,1);
+% % Fb2 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/6),sin(pi/6)],p,1);
+% % Fb3 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/3),sin(pi/3)],p,1);
+% % Fb4 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(pi/2),sin(pi/2)],p,1);
+% % Fb5 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(4*pi/6),sin(4*pi/6)],p,1);
+% % Fb6 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(5*pi/6),sin(5*pi/6)],p,1);
+% % Fb7 = sparse([nelx*(nely+1)-1,nelx*(nely+1)],1,[cos(6*pi/6),sin(6*pi/6)],p,1);
 % U = zeros(2*(nely+1)*(nelx+1),1);
 % 
 % %% PREPARE FILTER
@@ -85,32 +102,34 @@
 % Hs = sum(H,2);
 % 
 % %% Optimization, use multistart to deal with local solutions
-% ntrial = 25;
 % max_iter = 200;
+% 
+% load dM_dX_case1.mat;
+% % count = 0;
+% % dM_dX = sparse(p*nelx*nely,p);
+% % while count<nelx*nely
+% %     fprintf('calculate d|D|/dx, count=%d \n',count);
+% %     dM_dx = sparse(jK(count*64+(1:64)), iK(count*64+(1:64)),...
+% %         ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
+% %     dM_dX(count*p+(1:p),:) = dM_dx(freedofs,freedofs);
+% %     count = count + 1;
+% % end
+% 
+% load x0_obs_case1.mat; 
+% x0 = x;
+% o0_set = exp(51:1:122);
+% ntrial = length(o0_set);
 % x_soln = zeros(nelx*nely,ntrial);
 % f_soln = zeros(2,ntrial);
-% 
-load dM_dX.mat;
-% count = 0;
-% dM_dX = sparse(p*nelx*nely,p);
-% while count<nelx*nely
-%     fprintf('calculate d|D|/dx, count=%d \n',count);
-%     dM_dx = sparse(jK(count*64+(1:64)), iK(count*64+(1:64)),...
-%         ME(:)*(M0-Mmin), 2*(nely+1)*(nelx+1), 2*(nely+1)*(nelx+1));
-%     dM_dX(count*p+(1:p),:) = dM_dx(freedofs,freedofs);
-%     count = count + 1;
-% end
-
-load x0_obs.mat; 
-x0 = x;
-for trial = 1:0.1:4
+for trial = (length(o0_set)-1):-1:1
 %     x0 = ones(nely,nelx)*volfrac;
 %     x0 = x0/sum(x0(:))*volfrac*nelx*nely;
+    x0 = x_soln(:,trial+1);
     x_old = x0(:);
     x = x_old;
     dx = ones(nelx*nely,1);
 
-    o0 = 10^(trial-1); % target minimal detD
+    o0 = o0_set(trial); % target minimal detD
 
     loop = 0;
     change = 1;
@@ -120,7 +139,7 @@ for trial = 1:0.1:4
     w_old = 0;
     
     %% START ITERATION
-    while change > 1e-3 && loop < max_iter
+    while change > 1e-6 && loop < max_iter
         loop = loop + 1;
         sK = reshape(KE(:)*(Emin+x(:)'.^penal*(E0-Emin)),64*nelx*nely,1);
         K = sparse(iK,jK,sK); K = (K+K')/2;
@@ -134,32 +153,6 @@ for trial = 1:0.1:4
         % calculation of ddet(D)/dx = det(SM^-1Sp)M'*d(M^-1)/dx
         % calculate this only when the observability constraint is violated
         if o<o0
-%             ddet_dx = zeros(nelx*nely,1);
-%             ddet_dinvM = o*Mb';
-            
-%             tic
-%             temp = inv(Mb)*dM_dX;
-%             toc
-            
-%             tic
-%             for seg = 1:nely
-%                 fprintf('calculating ddet_dx, seg=%d',seg);
-%                 temp1 = temp(:,(seg-1)*p*nelx+(1:p*nelx));
-%                 temp2 = sparse(reshape(permute(reshape(full(temp1),p,p,[]),[1,3,2]),p*nelx,p)');
-%                 temp3 = ddet_dinvM*(inv(Mb)*temp2);
-%                 temp3 = reshape(temp3,p*p,[]);
-%                 ddet_dx((seg-1)*nelx+(1:nelx)) = sum(temp3(1:(p+1):end,:))';
-%             end
-%             toc
-% 
-%             tic
-%             for seg = 1:nelx*nely
-%                 fprintf('calculating ddet_dx, seg=%d',seg);
-%                 temp1 = temp(:,(seg-1)*p+(1:p));
-%                 temp3 = ddet_dinvM*(inv(Mb)*temp1');
-%                 ddet_dx(seg) = trace(temp3);
-%             end
-%             toc
             temp = (-dM_dX*inv(Mb)*o)';
             temp3 = reshape(temp,p*p,[]);
             ddet_dx = sum(temp3(1:(p+1):end,:))';
@@ -177,20 +170,22 @@ for trial = 1:0.1:4
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % calculate gradient for compliance
-        U1(freedofs) = Kb\Fb1;
-        U2(freedofs) = Kb\Fb2;
-        U3(freedofs) = Kb\Fb3;
-        U4(freedofs) = Kb\Fb4;
-        U5(freedofs) = Kb\Fb5;
-        U6(freedofs) = Kb\Fb6;
-        U7(freedofs) = Kb\Fb7;
-        ce = reshape(sum((U1(edofMat)*KE).*U1(edofMat)+...
-            (U2(edofMat)*KE).*U2(edofMat)+...
-            (U3(edofMat)*KE).*U3(edofMat)+...
-            (U4(edofMat)*KE).*U4(edofMat)+...
-            (U5(edofMat)*KE).*U5(edofMat)+...
-            (U6(edofMat)*KE).*U6(edofMat)+...
-            (U7(edofMat)*KE).*U7(edofMat),2),nely,nelx);
+        U(freedofs) = Kb\Fb;
+%         U1(freedofs) = Kb\Fb1;
+%         U2(freedofs) = Kb\Fb2;
+%         U3(freedofs) = Kb\Fb3;
+%         U4(freedofs) = Kb\Fb4;
+%         U5(freedofs) = Kb\Fb5;
+%         U6(freedofs) = Kb\Fb6;
+%         U7(freedofs) = Kb\Fb7;
+        ce = reshape(sum((U(edofMat)*KE).*U(edofMat),2),nely,nelx);
+%         ce = reshape(sum((U1(edofMat)*KE).*U1(edofMat)+...
+%             (U2(edofMat)*KE).*U2(edofMat)+...
+%             (U3(edofMat)*KE).*U3(edofMat)+...
+%             (U4(edofMat)*KE).*U4(edofMat)+...
+%             (U5(edofMat)*KE).*U5(edofMat)+...
+%             (U6(edofMat)*KE).*U6(edofMat)+...
+%             (U7(edofMat)*KE).*U7(edofMat),2),nely,nelx);
         c = sum(sum((Emin+reshape(x,nely,nelx).^penal*(E0-Emin)).*ce));
         dc = -penal*(E0-Emin)*reshape(x,nely,nelx).^(penal-1).*ce;
         dc(:) = H*(x(:).*dc(:))./Hs./max(1e-3,x(:)); % use filter
@@ -206,6 +201,7 @@ for trial = 1:0.1:4
         [dx,fval,exitflag,output,lambda_all] = linprog(f,A,b,Aeq,beq,lb,ub,zeros(nelx*nely,1));
         
 %         f = -ddet_dx;
+%         f = f/max(abs(f));
 %         Aeq = ones(1,nelx*nely);
 %         beq = 0;
 %         lb = zeros(nelx*nely,1)-x;
@@ -237,22 +233,22 @@ fprintf('take a step: alpha=%d \n',alpha)
             % update compliance
             sK = reshape(KE(:)*(Emin+x_temp(:)'.^penal*(E0-Emin)),64*nelx*nely,1);
             K = sparse(iK,jK,sK); K = (K+K')/2;Kb = K(freedofs,freedofs);
-%             U(freedofs) = Kb\Fb;
-%             ce = reshape(sum((U(edofMat)*KE).*U(edofMat),2),nely,nelx);
-            U1(freedofs) = Kb\Fb1;
-            U2(freedofs) = Kb\Fb2;
-            U3(freedofs) = Kb\Fb3;
-            U4(freedofs) = Kb\Fb4;
-            U5(freedofs) = Kb\Fb5;
-            U6(freedofs) = Kb\Fb6;
-            U7(freedofs) = Kb\Fb7;
-            ce = reshape(sum((U1(edofMat)*KE).*U1(edofMat)+...
-                (U2(edofMat)*KE).*U2(edofMat)+...
-                (U3(edofMat)*KE).*U3(edofMat)+...
-                (U4(edofMat)*KE).*U4(edofMat)+...
-                (U5(edofMat)*KE).*U5(edofMat)+...
-                (U6(edofMat)*KE).*U6(edofMat)+...
-                (U7(edofMat)*KE).*U7(edofMat),2),nely,nelx);
+            U(freedofs) = Kb\Fb;
+            ce = reshape(sum((U(edofMat)*KE).*U(edofMat),2),nely,nelx);
+%             U1(freedofs) = Kb\Fb1;
+%             U2(freedofs) = Kb\Fb2;
+%             U3(freedofs) = Kb\Fb3;
+%             U4(freedofs) = Kb\Fb4;
+%             U5(freedofs) = Kb\Fb5;
+%             U6(freedofs) = Kb\Fb6;
+%             U7(freedofs) = Kb\Fb7;
+%             ce = reshape(sum((U1(edofMat)*KE).*U1(edofMat)+...
+%                 (U2(edofMat)*KE).*U2(edofMat)+...
+%                 (U3(edofMat)*KE).*U3(edofMat)+...
+%                 (U4(edofMat)*KE).*U4(edofMat)+...
+%                 (U5(edofMat)*KE).*U5(edofMat)+...
+%                 (U6(edofMat)*KE).*U6(edofMat)+...
+%                 (U7(edofMat)*KE).*U7(edofMat),2),nely,nelx);
             c_temp = sum(sum((Emin+reshape(x_temp,nely,nelx).^penal*(E0-Emin)).*ce));
             
             % update observability
@@ -290,8 +286,10 @@ figure;
 countx = 0;
 county = 0;
 margin = 2;
+% image_all = zeros(ceil(length(o_set)/4)*nely+(ceil(length(o_set)/4)-1)*margin,4*nelx+3*margin);
 image_all = zeros(3*nely+2*margin,4*nelx+3*margin);
-for i = 1:3:36
+
+for i = 1:6:ntrial
     image_all(county*(nely+margin)+(1:nely),countx*(nelx+margin)+(1:nelx)) = reshape(x_soln(:,i),nely,nelx);
     countx = countx+1;
     if countx==4
@@ -301,4 +299,5 @@ for i = 1:3:36
 end
 colormap(gray); imagesc(1-image_all);
 caxis([0 1]); axis equal; axis off; drawnow;
-count = count + 1;
+
+figure;plot(-log(f_soln(1,:)),log(f_soln(2,:)),'.','MarkerSize',20);
